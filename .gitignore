@@ -1,0 +1,26 @@
+# Arduino build folders
+build/
+*.elf
+*.bin
+*.hex
+*.eep
+*.map
+
+# Arduino IDE backup files
+*.orig
+*.bak
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# VSCode / PlatformIO
+.vscode/
+.pio/
+
+# Temporary files
+*.tmp
+*.log
+
+# Exclude everything in _legacy from ignore
+!_legacy/
