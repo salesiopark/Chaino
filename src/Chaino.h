@@ -174,55 +174,55 @@ namespace chaino_detail {
             }
 
             //String.toInt()메서드는 long형을 반환하고 RP2040에서는 long == int 이다(4바이트)
-            //preset이 넘어온 경우 and 읽어들일 arg가 없으면 preset반환
-            inline int getInt(int p=0) {
-                return (_idGet<_vecStr.size()? _vecStr[_idGet++].toInt():p);
+            //더이상 get할게 없으면 단순히 기본값 반환
+            inline int getInt() {
+                return (_idGet<_vecStr.size()? _vecStr[_idGet++].toInt():0);
             }
 
-            inline unsigned int getUInt(unsigned int p=0) {
-                return static_cast<unsigned int>(getInt(p)); 
+            inline unsigned int getUInt() {
+                return static_cast<unsigned int>(getInt()); 
             }
 
-            inline long getLong(long p=0) {
-                return getInt(p);
+            inline long getLong() {
+                return getInt();
             }
 
-            inline unsigned long getULong(unsigned long p=0) {
-                return static_cast<unsigned long>(getInt(p)); 
+            inline unsigned long getULong() {
+                return static_cast<unsigned long>(getInt()); 
             }
 
-            inline byte getByte(byte p=0) {
-                return byte(getInt(p));
+            inline byte getByte() {
+                return byte(getInt());
             }
 
-            inline char getChar(char p=0) {
-                return char(getInt(p));
+            inline char getChar() {
+                return char(getInt());
             }
 
-            inline short getShort(short p=0) {
-                return short(getInt(p));
+            inline short getShort() {
+                return short(getInt());
             }
 
-            inline unsigned short getUShort(unsigned short p=0) {
-                return static_cast<unsigned short>(getInt(p)); 
+            inline unsigned short getUShort() {
+                return static_cast<unsigned short>(getInt()); 
             }
 
-            inline bool getBool(bool p=false) {
-                if (_idGet >= _vecStr.size()) return p;//읽을 arg가 없다면 지정된 p를 반환
+            inline bool getBool() {
+                if (_idGet >= _vecStr.size()) return false;//읽을 arg가 없다면 지정된 p를 반환
                 else return (_vecStr[_idGet++].toInt()==1);
             }
 
             //String.getFloat()는 내부적으로 float(toDouble())로 정의되어 있다.
-            inline double getDouble(double p=0) {
-                return _idGet<_vecStr.size()? _vecStr[_idGet++].toDouble():p;
+            inline double getDouble() {
+                return _idGet<_vecStr.size()? _vecStr[_idGet++].toDouble():0.0;
             }
 
-            inline float getFloat(float p=0) {
-                return float(getDouble(p));
+            inline float getFloat() {
+                return float(getDouble());
             }
 
-            inline String getString(const String& p=EMPTY_STR) {
-                return (_idGet<_vecStr.size() ? _vecStr[_idGet++]:p);
+            inline String getString() {
+                return (_idGet<_vecStr.size() ? _vecStr[_idGet++]:EMPTY_STR);
             }
 
             /*
@@ -689,15 +689,18 @@ namespace chaino_detail {
     
     //203번 함수(고정)
     void who() {
-        String str = strWho + "(I2C addr.:0x"+String(i2c::address,HEX)+")";
+        String str = strWho + "(I2C addr:0x"+String(i2c::address,HEX)+")";
         retParams.add(str);
     }
 
 
+
     //201번 함수(고정):i2c어드레스를 바꾸는 함수
     void setI2cAddr() {
-        byte newAddr =  argParams.getByte(i2c::ADDR_DEFAULT);
-        if (newAddr <0x40 or newAddr > 0x79) {
+
+        byte newAddr =  argParams.getByte();
+
+        if (newAddr <0x01 or newAddr > 0x79) {
             retParams.add("I2C address must be between 0x40 and 0x79. Fail to change I2C address.");
         } else if (newAddr == i2c::address) {
             retParams.add("I2C address is already 0x"+String(newAddr,HEX)+".");
@@ -750,13 +753,11 @@ namespace chaino_detail {
         neoPx.begin(); //i2c::beginMasterOrSlave()보다 먼저 호출해야 함
         i2c::beginMasterOrSlave();
 
-        //funcPtrMap[0]   = who;
         // 0번 함수는 "ImChn"라는 문자열을 반환해서 Chaino장치를 인식하는데 사용
-        funcPtrMap[0] = [](){retParams.add("ImChn");};//"I am Chaino"를 반환하는 람다함수
-
-        funcPtrMap[201] = setI2cAddr;   //201번도 고정
-        funcPtrMap[202] = setNeopixel;  //202번도 고정
-        funcPtrMap[203] = who;  //203번도 고정
+        funcPtrMap[0] = [](){retParams.add("ImChn");};
+        funcPtrMap[201] = setI2cAddr;   //201번 고정
+        funcPtrMap[202] = setNeopixel;  //202번 고정
+        funcPtrMap[203] = who;          //203번 고정
 
         isInitialized = true;// init()은 **딱 한 번만** 호출되어야 한다.
 
@@ -890,9 +891,9 @@ public:
     * This function returns a reference to the internal `chaino_detail::Params` object 
     * that stores the arguments for the currently executing function.  
     * 
-    * @note The returned object supports multiple explicit type conversions  
-    * (e.g., to `int`, `float`, `String`, `bool`, etc.), but these conversions are declared  
-    * as `explicit` to prevent accidental type coercion.  
+    * @note The returned object supports multiple explicit type conversions  (bool, byte,
+    * char, int, short, long, unsigned int, unsigned short, unsigned long, float, double, and String),
+    * but these conversions are declared as `explicit` to prevent accidental type coercion.  
     * **Therefore, you must use an explicit cast** 
     *
     * ### Example – Explicit cast:
@@ -952,6 +953,10 @@ public:
     *
     * @return `true` if the function executed successfully (response payload starts with 'S'),  
     *         `false` otherwise.
+    *
+    * @note The resulting return values can be accessed using `getReturn()` method.
+    *
+    * @see getReturn()
     */
     template<typename... Args>         
     bool execFunc(byte func_id, Args&&... args) {
@@ -981,6 +986,7 @@ public:
     }
     
 
+
     /**
     * @brief Retrieves the 'Params' object for processing return value.
     *
@@ -993,8 +999,8 @@ public:
     *
     * ### Example – Direct access to return parameters:
     * @code
-    * if (c.execFunc(15)) {  // Execute function that returns multiple values
-    *     int r = (int)c.getReturn();
+    * if (execFunc(15)) {
+    *     int r = (int)getReturn();
     * }
     * @endcode
     *
@@ -1010,19 +1016,112 @@ public:
     */
     inline chaino_detail::Params& getReturn() {return _rets;}
 
-
     
+
+    /**
+    * @brief Changes the I2C address of the device.
+    *
+    * This function executes the built-in function to change the I2C slave address
+    * of the target device. The new address is stored in EEPROM and requires a device
+    * reset to take effect.
+    *
+    * @param newAddr The new I2C address to set (valid range: 0x01 to 0x79)
+    *
+    * @return String containing the result message:
+    *         - Success: "I2C address successfully changed to 0xXX. Reset the board."
+    *         - Already set: "I2C address is already 0xXX."
+    *         - Invalid range: "I2C address must be between 0x01 and 0x79. Fail to change I2C address."
+    *         - EEPROM error: "Fail to change I2C address."
+    *
+    * @note The valid I2C address range is 0x40-0x79 to avoid conflicts with reserved addresses.
+    * @note A device reset is required after successful address change.
+    * @note This function works on both local device (master) and remote I2C slave devices.
+    *
+    * ### Example:
+    * @code
+    * Chaino device(0x45);  // Target device at address 0x45
+    * String result = device.set_i2c_address(0x50);
+    * Serial.println(result);  // Print the result message
+    * 
+    * // For local device
+    * Chaino localDevice;
+    * String result = localDevice.set_i2c_address(0x48);
+    * @endcode
+    *
+    */
     String set_i2c_address(byte newAddr) {
         execFunc(201, newAddr);
         return (String)getReturn();
     }
     
     
+
+    /**
+    * @brief Controls the onboard NeoPixel LED color.
+    *
+    * This function executes the built-in function to set the RGB color
+    * of the device's onboard NeoPixel LED. The LED will immediately display
+    * the specified color.
+    *
+    * @param r Red component (0-255)
+    * @param g Green component (0-255)  
+    * @param b Blue component (0-255)
+    *
+    * @note RGB values are clamped to the range 0-255.
+    *
+    * ### Example:
+    * @code
+    * Chaino device(0x45);  // Target device at address 0x45
+    * device.set_neopixel(255, 0, 0);    // Set to red
+    * device.set_neopixel(0, 255, 0);    // Set to green
+    * device.set_neopixel(0, 0, 255);    // Set to blue
+    * device.set_neopixel(255, 255, 0);  // Set to yellow
+    * device.set_neopixel(0, 0, 0);      // Turn off LED
+    * 
+    * // For local device
+    * Chaino localDevice;
+    * localDevice.set_neopixel(128, 64, 192);  // Set to purple
+    * @endcode
+    *
+    */
     void set_neopixel(int r, int g, int b) {
         execFunc(202, r, g, b);
     }
     
 
+
+    /**
+    * @brief Retrieves the device identification string.
+    *
+    * This function executes the built-in function get the device's
+    * identification information, including the device name and current I2C address.
+    * The device name is set during `Chaino::setup()` initialization, and if not
+    * provided, defaults to "Chaino_Unknown".
+    *
+    * @return String containing device identification in the format:
+    *         "DeviceName (I2C addr.:0xXX)"
+    *         - DeviceName: The name set during `Chaino::setup(name)` or "Chaino_Unknown" if not set
+    *         - 0xXX: Current I2C address in hexadecimal format (e.g., 0x40, 0x45)
+    *
+    * @note This function works on both local device (master) and remote I2C slave devices.
+    *
+    * ### Example – Basic device identification:
+    * @code
+    * // In setup, device was initialized with:
+    * // Chaino::setup("MySensor");
+    * 
+    * Chaino device(0x45);  // Target device at address 0x45
+    * String deviceInfo = device.who();
+    * Serial.println(deviceInfo);  // Output: "MySensor (I2C addr.:0x45)"
+    * 
+    * // For local device
+    * Chaino localDevice;
+    * String localInfo = localDevice.who();
+    * Serial.println(localInfo);   // Output: "MySensor(I2C addr.:0x40)"
+    * @endcode
+    *
+    * @see Chaino::setup(), set_i2c_address()
+    */
     String who() {
         execFunc(203);
         return (String)getReturn();
