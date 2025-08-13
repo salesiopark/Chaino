@@ -825,9 +825,6 @@ public:
     Chaino(byte addr=0): _i2cAddr(addr) {}                  
 
 
-    /*-----------------------------------------------------
-        static methods
-    ------------------------------------------------------*/
     /**
      * @brief Initialize the Chaino system
      * @param name Device name string
@@ -985,48 +982,39 @@ public:
     
 
     /**
-    * @name Return value getters
-    * @brief Retrieves the return value(s) from the last executed function.
+    * @brief Retrieves the 'Params' object for processing return value.
     *
-    * These methods read and consume the stored return parameters from the hidden buffer,
-    * which is populated after calling `execFunc()`.  
-    * Each call advances the internal read index, so values must be retrieved in the same order
-    * they were set using `setReturn()` in the executed function.
+    * This function returns a reference to the internal `Params` object that stores all 
+    * return values from the last executed function. The `Params` object allows you
+    * to cast explicitly into the specific type such as `int`, `float`, `String`, etc.
     *
-    * @note If you call a getter when no more values are available, the default value
-    *       for that type will be returned.
-    * @note Each getter call consumes one return value — it cannot be read again.
+    * @return Reference to the `Params` object containing return values from
+    *         the last `execFunc()` call.
     *
-    * ### Example:
+    * ### Example – Direct access to return parameters:
     * @code
-    * if (c.execFunc(10)) {
-    *     int value = c.getReturnInt();
-    *     String msg = c.getReturnString();
+    * if (c.execFunc(15)) {  // Execute function that returns multiple values
+    *     int r = (int)c.getReturn();
     * }
     * @endcode
     *
-    * @see execFunc(), setReturn()
+    * ### Example – Processing variable return values:
+    * @code
+    * int read_digital(int pin) {
+    *     execFunc(2, pin);
+    *     return (int)getReturn();
+    * }
+    * @endcode
+    *
+    * @see execFunc(), getArg()
     */
-    ///@{
-    inline bool             getReturnBool()     {return _rets.getBool();}
-    inline char             getReturnChar()     {return _rets.getChar();}          
-    inline byte             getReturnByte()     {return _rets.getByte();}          
-    inline int              getReturnInt()      {return _rets.getInt();}          
-    inline unsigned int     getReturnUInt()     {return _rets.getUInt();}          
-    inline long             getReturnLong()     {return _rets.getLong();}          
-    inline unsigned long    getReturnULong()    {return _rets.getULong();}          
-    inline short            getReturnShort()    {return _rets.getShort();}          
-    inline unsigned short   getReturnUShort()   {return _rets.getUShort();}          
-    inline float            getReturnFloat()    {return _rets.getFloat();}          
-    inline double           getReturnDouble()   {return _rets.getDouble();}          
-    inline String           getReturnString()   {return _rets.getString();}          
-    ///@}
+    inline chaino_detail::Params& getReturn() {return _rets;}
 
 
     
     String set_i2c_address(byte newAddr) {
         execFunc(201, newAddr);
-        return getReturnString();
+        return (String)getReturn();
     }
     
     
@@ -1037,7 +1025,7 @@ public:
 
     String who() {
         execFunc(203);
-        return getReturnString();
+        return (String)getReturn();
     }
 
 

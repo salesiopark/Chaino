@@ -22,5 +22,5 @@ Thumbs.db
 *.tmp
 *.log
 
-# Exclude everything in _legacy from ignore
-!.legacy/
+# .legacy 폴더 전체를 무시
+.legacy/

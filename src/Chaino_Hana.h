@@ -83,7 +83,7 @@ public:
 
     int read_digital(int pin){
         execFunc(2, pin);
-        return getReturnInt();
+        return (int)getReturn();
     }
 
     void write_digital(int pin, int status) {
@@ -92,7 +92,7 @@ public:
 
     int read_analog(int pin) {
         execFunc(4, pin);
-        return getReturnInt();
+        return (int)getReturn();
     }
 
     void write_analog(int pin, int duty) {
