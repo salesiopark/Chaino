@@ -818,14 +818,25 @@ namespace chaino_detail {
 class Chaino {     
 public:
 
+    /**
+     * @brief Constructor
+     * @param addr I2C address (0 for master device)
+     */
     Chaino(byte addr=0): _i2cAddr(addr) {}                  
 
 
     /*-----------------------------------------------------
         static methods
     ------------------------------------------------------*/
-
+    /**
+     * @brief Initialize the Chaino system
+     * @param name Device name string
+     */
     static inline void setup(const String& name="") {chaino_detail::init(name);}
+    
+    /**
+     * @brief Main processing loop - must be called in Arduino loop()
+     */
     static inline void loop() {chaino_detail::chainoLoop();}
 
 

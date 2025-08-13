@@ -2,16 +2,14 @@ name: Build Doxygen & Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ "main" ]   # main 브랜치에 푸시될 때 자동 실행
-  workflow_dispatch:        # 수동 실행 허용
+    branches: [ "main" ]
+  workflow_dispatch:
 
-# GitHub Pages 배포 권한
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# 중복 배포 방지
 concurrency:
   group: "pages"
   cancel-in-progress: true
@@ -31,10 +29,38 @@ jobs:
       - name: Show Doxygen version
         run: doxygen --version
 
-      - name: Generate Doxygen
-        run: doxygen Doxyfile
+      # 디버깅: 파일 구조 확인
+      - name: Check file structure
+        run: |
+          echo "=== Repository structure ==="
+          find . -name "*.h" -o -name "*.cpp" -o -name "*.ino" | head -20
+          echo "=== src directory ==="
+          ls -la src/ || echo "src directory not found"
+          echo "=== examples directory ==="
+          ls -la examples/ || echo "examples directory not found"
 
-      # 무엇을 파싱했는지 확인용 로그 업로드 (Doxyfile에 WARN_LOGFILE=doxygen_warnings.log 설정 필요)
+      # 디버깅: Doxyfile 설정 확인
+      - name: Check Doxyfile settings
+        run: |
+          echo "=== INPUT setting ==="
+          grep "^INPUT" Doxyfile || echo "INPUT not found"
+          echo "=== OUTPUT_DIRECTORY setting ==="
+          grep "^OUTPUT_DIRECTORY" Doxyfile || echo "OUTPUT_DIRECTORY not found"
+
+      - name: Generate Doxygen
+        run: |
+          doxygen Doxyfile
+          echo "=== Doxygen generation completed ==="
+
+      # 생성된 파일 확인
+      - name: Check generated files
+        run: |
+          echo "=== Generated documentation structure ==="
+          ls -la docs/ || echo "docs directory not found"
+          ls -la docs/html/ || echo "docs/html directory not found"
+          echo "=== HTML files count ==="
+          find docs/html -name "*.html" | wc -l || echo "No HTML files found"
+
       - name: Upload Doxygen log
         uses: actions/upload-artifact@v4
         with:
@@ -42,7 +68,6 @@ jobs:
           path: doxygen_warnings.log
           if-no-files-found: ignore
 
-      # Doxyfile의 OUTPUT_DIRECTORY/html 과 일치해야 함 (예: docs/html)
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
