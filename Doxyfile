@@ -1,4 +1,4 @@
-# -------- Project --------
+# ----- Project -----
 PROJECT_NAME           = "Chaino"
 PROJECT_BRIEF          = "Arduino library for controlling devices over Serial/i2c"
 PROJECT_NUMBER         = 0.8.0
@@ -6,45 +6,33 @@ OUTPUT_DIRECTORY       = docs
 GENERATE_HTML          = YES
 GENERATE_LATEX         = NO
 HTML_OUTPUT            = html
-# 사이드 트리뷰(좌측 탐색)
 GENERATE_TREEVIEW      = YES
-
-# -------- Inputs --------
-# 소스가 여기 있다고 가정: src/ 와 include/
-INPUT                  = README.md src include examples
-FILE_PATTERNS          = *.h *.hpp *.c *.cpp *.ino *.md
-RECURSIVE              = YES
-EXCLUDE                = .legacy
-EXCLUDE_PATTERNS       = */.legacy/* */tests/* */.venv/*
-
-# 내부 네임스페이스 숨기기(예: chaino_detail)
-EXCLUDE_SYMBOLS        = chaino_detail *
-
-# README.md를 메인 페이지로
 USE_MDFILE_AS_MAINPAGE = README.md
 MARKDOWN_SUPPORT       = YES
+JAVADOC_AUTOBRIEF      = YES
 
-# -------- Extraction --------
-EXTRACT_ALL            = NO
-EXTRACT_PRIVATE        = NO
-EXTRACT_STATIC         = NO
-EXTRACT_LOCAL_CLASSES  = NO
+# ----- Inputs -----
+INPUT                  = src README.md
+RECURSIVE              = YES
+FILE_PATTERNS          = *.h *.hpp *.c *.cpp *.ino *.md
+EXTENSION_MAPPING      = ino=C++
+EXCLUDE                = .git .github .legacy .venv build dist
+EXCLUDE_PATTERNS       = */.legacy/*
+
+# 내부는 이미 \cond ... \endcond로 숨김 처리되어 있으므로 아래는 불필요
+# EXCLUDE_SYMBOLS        = chaino_detail::*
+
+# ----- Extraction -----
+EXTRACT_ALL            = YES      # 우선 전부 노출해서 '안 뜨는' 문제부터 해결
 HIDE_UNDOC_MEMBERS     = YES
 HIDE_UNDOC_CLASSES     = YES
 
-# -------- Diagrams --------
+# ----- Diagrams -----
 HAVE_DOT               = YES
-DOT_NUM_THREADS        = 2
+CLASS_GRAPH            = YES
 CALL_GRAPH             = YES
 CALLER_GRAPH           = YES
-CLASS_GRAPH            = YES
-DOT_TRANSPARENT        = YES
 INTERACTIVE_SVG        = YES
 
-# -------- Warnings (선택) --------
-WARN_IF_UNDOCUMENTED   = NO
-WARN_AS_ERROR          = NO
-
-# -------- HTML Polish --------
-HTML_COLORSTYLE_HUE    = 200
-HTML_DYNAMIC_SECTIONS  = YES
+# ----- Log -----
+WARN_LOGFILE           = doxygen_warnings.log

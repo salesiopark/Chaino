@@ -23,4 +23,4 @@ Thumbs.db
 *.log
 
 # Exclude everything in _legacy from ignore
-!_legacy/
+!.legacy/
