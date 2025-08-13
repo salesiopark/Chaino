@@ -1,0 +1,50 @@
+name: Build Doxygen & Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ "main" ]     # main으로 푸시할 때마다 문서 갱신
+  workflow_dispatch:          # 수동 실행도 허용
+
+# Pages 배포에 필요한 권한
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Doxygen + Graphviz 설치 (다이어그램용)
+      - name: Install Doxygen & Graphviz
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+
+      # Doxygen 실행
+      - name: Generate Doxygen
+        run: doxygen Doxyfile
+
+      # 생성된 HTML 산출물 업로드 (docs/html)
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/html
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
