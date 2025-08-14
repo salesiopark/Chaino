@@ -356,6 +356,7 @@ namespace chaino_detail {
         //const int MAX_I2C_PACKET_LEN = 250;
         const byte ADDR_DEFAULT = 0x40;
         byte address;
+        bool isMaster = false;
 
         namespace master{
 
@@ -366,7 +367,7 @@ namespace chaino_detail {
                 Wire1.setSCL(3);
                 Wire1.begin();
                 Wire1.setClock(400000);//반드시 Wire1.begin()직후에 fast모드로 설정 (default:100kHz이므로)
-                //isSlave = false;
+                isMaster = true;
                 //Serial.println("I2C Master 모드 초기화 완료");
             }
 
@@ -766,7 +767,7 @@ namespace chaino_detail {
 
     inline void chainoLoop(){
 
-        if (Serial.available()) {
+        if (i2c::isMaster && Serial.available()) {
             Packet packet = serial::readPacket();
             String payloadExeFn = processSerialPacket(packet);
             if (payloadExeFn.isEmpty()) return;
