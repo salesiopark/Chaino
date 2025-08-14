@@ -355,7 +355,7 @@ namespace chaino_detail {
 
         //const int MAX_I2C_PACKET_LEN = 250;
         const byte ADDR_DEFAULT = 0x40;
-        byte address;
+        byte address = ADDR_DEFAULT;
         bool isMaster = false;
 
         namespace master{
