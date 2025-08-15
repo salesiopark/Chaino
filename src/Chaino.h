@@ -1,4 +1,4 @@
-/* chaino ver. 1.0.0
+/* Chaino ver. 0.9.0
 2025년07월16일 : 최초 파일 생성(개발 시작)
 2025년07월30일 : <map>으로 PtrFunc을 관리하는 방식으로 수정
 2025년07월31일 : Wire1으로 교체하여 Wire는 사용자가 이용하도록 수정
@@ -355,7 +355,7 @@ namespace chaino_detail {
 
         //const int MAX_I2C_PACKET_LEN = 250;
         const byte ADDR_DEFAULT = 0x40;
-        byte address = ADDR_DEFAULT;
+        volatile byte address = ADDR_DEFAULT;
         bool isMaster = false;
 
         namespace master{
@@ -700,9 +700,9 @@ namespace chaino_detail {
     void setI2cAddr() {
 
         byte newAddr =  argParams.getByte();
-
-        if (newAddr <0x01 or newAddr > 0x79) {
-            retParams.add("I2C address must be between 0x40 and 0x79. Fail to change I2C address.");
+        // (AI)실무에선 7-bit 유효/안전 대역을 0x08–0x77로 두는 경우가 많다고 함
+        if (newAddr <0x08 or newAddr > 0x79) {
+            retParams.add("I2C address must be between 0x08 and 0x79. Fail to change I2C address.");
         } else if (newAddr == i2c::address) {
             retParams.add("I2C address is already 0x"+String(newAddr,HEX)+".");
         } else {

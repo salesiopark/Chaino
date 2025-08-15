@@ -1,0 +1,24 @@
+#######################################
+# Syntax Coloring Map For MyLibrary
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+Chaino	KEYWORD1
+Chaino_Hana	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+set_i2c_addr	KEYWORD2
+set_neopixel	KEYWORD2
+who	            KEYWORD2
+getArg	        KEYWORD2
+setReturn   	KEYWORD2
+getReturn   	KEYWORD2
+execFunc   	    KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
