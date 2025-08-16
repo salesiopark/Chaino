@@ -1,4 +1,4 @@
-/* Chaino ver. 0.9.0
+/* Chaino ver. 0.9.1
 2025년07월16일 : 최초 파일 생성(개발 시작)
 2025년07월30일 : <map>으로 PtrFunc을 관리하는 방식으로 수정
 2025년07월31일 : Wire1으로 교체하여 Wire는 사용자가 이용하도록 수정
@@ -687,13 +687,13 @@ namespace chaino_detail {
     }
 
 
-    
+    /*
     //203번 함수(고정)
     void who() {
         String str = strWho + "(I2C addr:0x"+String(i2c::address,HEX)+")";
         retParams.add(str);
     }
-
+    */
 
 
     //201번 함수(고정):i2c어드레스를 바꾸는 함수
@@ -758,7 +758,8 @@ namespace chaino_detail {
         funcPtrMap[0] = [](){retParams.add("ImChn");};
         funcPtrMap[201] = setI2cAddr;   //201번 고정
         funcPtrMap[202] = setNeopixel;  //202번 고정
-        funcPtrMap[203] = who;          //203번 고정
+        funcPtrMap[203] = [](){retParams.add(strWho);};    //203번 고정: String who()
+        funcPtrMap[204] = [](){retParams.add(i2c::address);};    //204번 고정: byte get_addr()
 
         isInitialized = true;// init()은 **딱 한 번만** 호출되어야 한다.
 
@@ -1041,18 +1042,18 @@ public:
     * ### Example:
     * @code
     * Chaino device(0x45);  // Target device at address 0x45
-    * String result = device.set_i2c_address(0x50);
+    * String result = device.set_addr(0x50);
     * Serial.println(result);  // Print the result message
     * 
     * // For local device
     * Chaino localDevice;
-    * String result = localDevice.set_i2c_address(0x48);
+    * String result = localDevice.set_addr(0x48);
     * @endcode
     *
     */
-    String set_i2c_address(byte newAddr) {
+    String set_addr(byte newAddr) {
         execFunc(201, newAddr);
-        return (String)getReturn();
+        return (String)getReturn(); //결과를 알리는 문자열
     }
     
     
@@ -1126,6 +1127,38 @@ public:
     String who() {
         execFunc(203);
         return (String)getReturn();
+    }
+
+
+    /**
+    * @brief Gets the current I2C address of the target device.
+    *
+    * @return The current I2C address as a 7-bit value (e.g., 0x40).
+    *
+    * @note The returned value reflects the I2C address
+    * when the device is used as a slave one.
+    *
+    * ### python Example – Read local and remote addresses
+    * @code
+    * Chaino local("COM9");                // master (this device)
+    * byte a0 = local.get_addr();  // e.g., 0x40
+    *
+    * Chaino sensor("COM9", 0x45);         // remote slave at 0x45 through Serial 
+    * byte a1 = sensor.get_addr(); // returns 0x45 (device's current address)
+    * @endcode
+    *
+    * ### Micropython Example – Read local and remote addresses
+    * @code
+    *
+    * Chaino sensor(0x45);         // remote slave at 0x45
+    * byte a1 = sensor.get_addr(); // returns 0x45 (device's current address)
+    * @endcode
+    *
+    * @see set_addr()
+    */
+    byte get_addr() {
+        execFunc(204);
+        return (byte)getReturn();
     }
 
 

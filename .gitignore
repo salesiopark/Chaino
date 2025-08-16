@@ -24,3 +24,4 @@ Thumbs.db
 
 # .legacy 폴더 전체를 무시
 .legacy/
+arduino-lint.exe
