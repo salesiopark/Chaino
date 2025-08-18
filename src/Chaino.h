@@ -1,4 +1,4 @@
-/* Chaino ver. 0.9.1
+/* Chaino core
 2025년07월16일 : 최초 파일 생성(개발 시작)
 2025년07월30일 : <map>으로 PtrFunc을 관리하는 방식으로 수정
 2025년07월31일 : Wire1으로 교체하여 Wire는 사용자가 이용하도록 수정
@@ -9,6 +9,7 @@
 */
 #pragma once
 
+#define __CHAINO_VER__ "0.9.4"
 
 #include <map>
 #include <vector>
@@ -26,10 +27,10 @@
 namespace chaino_detail {
 
     const byte PIN_MASTER_SLAVE = 8;
+    String strWho = "Chaino";
+    String strVer = __CHAINO_VER__;
+
     
-    String strWho = "Chaino_Unknown";//string that returned by func#201
-
-
     Adafruit_NeoPixel neoPx(1, 16, NEO_GRB + NEO_KHZ800);
     void setNeoPxColorRGB(const byte r, const byte g, const byte b){
         neoPx.setPixelColor(0, neoPx.Color(r, g, b)); // (R,G,B)
@@ -728,19 +729,17 @@ namespace chaino_detail {
     }
 
 
-    //void setWhoStr(const String& strWhoR = strWho) {strWho = strWhoR; }
+    void setVer(const char* ver) {strVer = ver;}
 
 
     //init()은 딱 한 번만 호출되어야 한다.
     bool isInitialized = false;
 
-    void init(const String& strName = EMPTY_STR) {
-
-        if (!strName.isEmpty()) {
-            strWho = strName; //사용자가 지정한 strName으로 초기화
-        }
-
+    void init(const String& name) {
+        
         if(isInitialized) return;
+
+        if(!name.isEmpty()) strWho = name;
 
         // i2c_slave_addr을 ROM에서 읽음
         EEPROM.begin(1); //RP2040zero
@@ -754,12 +753,15 @@ namespace chaino_detail {
         neoPx.begin(); //i2c::beginMasterOrSlave()보다 먼저 호출해야 함
         i2c::beginMasterOrSlave();
 
-        // 0번 함수는 "ImChn"라는 문자열을 반환해서 Chaino장치를 인식하는데 사용
-        funcPtrMap[0] = [](){retParams.add("ImChn");};
-        funcPtrMap[201] = setI2cAddr;   //201번 고정
-        funcPtrMap[202] = setNeopixel;  //202번 고정
-        funcPtrMap[203] = [](){retParams.add(strWho);};    //203번 고정: String who()
-        funcPtrMap[204] = [](){retParams.add(i2c::address);};    //204번 고정: byte get_addr()
+        // 0번 함수는 "ImChn"라는 문자열을 반환해서 Chaino장치를 인식하는데 내부적으로 사용
+        funcPtrMap[0] = [](){retParams.add("ImChn");};          //0번 고정: dev인식용으로 내부사용
+        funcPtrMap[201] = [](){retParams.add(strWho);};         //201번 고정: String who()
+        funcPtrMap[202] = [](){                                 //202번 고정: String get_version()
+            retParams.add(strWho+" Firmware v"+strVer);
+        }; 
+        funcPtrMap[203] = [](){retParams.add(i2c::address);};   //203번 고정: byte get_addr()
+        funcPtrMap[204] = setI2cAddr;                           //204번 고정: void set_addr()
+        funcPtrMap[205] = setNeopixel;                          //205번 고정: void set_neopixel()
 
         isInitialized = true;// init()은 **딱 한 번만** 호출되어야 한다.
 
@@ -779,6 +781,7 @@ namespace chaino_detail {
     }
 
 }
+/////////////////////////////////////////////////////////////////////////////////////////////
 /// \endcond
 
 
@@ -830,9 +833,12 @@ public:
 
     /**
      * @brief Initialize the Chaino system
-     * @param name Device name string
+     * @param name Device name string (default:"Chaino_Unknown")
      */
-    static inline void setup(const String& name="") {chaino_detail::init(name);}
+    static inline void setup(const String& name = chaino_detail::EMPTY_STR) {
+        chaino_detail::init(name);
+    }
+
     
     /**
      * @brief Main processing loop - must be called in Arduino loop()
@@ -1020,6 +1026,85 @@ public:
 
     
 
+    //-----------------------------------------------------------------------------------
+    /**
+    * @brief Retrieves the device identification string.
+    *
+    * This function executes the built-in function get the device's
+    * identification information, including the device name and current I2C address.
+    * The device name is set during `Chaino::setup()` initialization, and if not
+    * provided, defaults to "Chaino_Unknown".
+    *
+    * @return String containing device identification in the format:
+    *         "DeviceName (I2C addr.:0xXX)"
+    *         - DeviceName: The name set during `Chaino::setup(name)` or "Chaino_Unknown" if not set
+    *         - 0xXX: Current I2C address in hexadecimal format (e.g., 0x40, 0x45)
+    *
+    * @note This function works on both local device (master) and remote I2C slave devices.
+    *
+    * ### Example – Basic device identification:
+    * @code
+    * // In setup, device was initialized with:
+    * // Chaino::setup("MySensor");
+    * 
+    * Chaino device(0x45);  // Target device at address 0x45
+    * String deviceInfo = device.who();
+    * Serial.println(deviceInfo);  // Output: "MySensor (I2C addr.:0x45)"
+    * 
+    * // For local device
+    * Chaino localDevice;
+    * String localInfo = localDevice.who();
+    * Serial.println(localInfo);   // Output: "MySensor(I2C addr.:0x40)"
+    * @endcode
+    *
+    * @see Chaino::setup(), set_i2c_address()
+    */
+    String who() {
+        execFunc(201);
+        return (String)getReturn();
+    }
+
+
+    String get_version(){
+        execFunc(202);
+        return (String)getReturn();
+    }
+
+
+
+    /**
+    * @brief Gets the current I2C address of the target device.
+    *
+    * @return The current I2C address as a 7-bit value (e.g., 0x40).
+    *
+    * @note The returned value reflects the I2C address
+    * when the device is used as a slave one.
+    *
+    * ### python Example – Read local and remote addresses
+    * @code
+    * Chaino local("COM9");                // master (this device)
+    * byte a0 = local.get_addr();  // e.g., 0x40
+    *
+    * Chaino sensor("COM9", 0x45);         // remote slave at 0x45 through Serial 
+    * byte a1 = sensor.get_addr(); // returns 0x45 (device's current address)
+    * @endcode
+    *
+    * ### Micropython Example – Read local and remote addresses
+    * @code
+    *
+    * Chaino sensor(0x45);         // remote slave at 0x45
+    * byte a1 = sensor.get_addr(); // returns 0x45 (device's current address)
+    * @endcode
+    *
+    * @see set_addr()
+    */
+    byte get_addr() {
+        execFunc(203);
+        return (byte)getReturn();
+    }
+
+
+
     /**
     * @brief Changes the I2C address of the device.
     *
@@ -1052,7 +1137,7 @@ public:
     *
     */
     String set_addr(byte newAddr) {
-        execFunc(201, newAddr);
+        execFunc(204, newAddr);
         return (String)getReturn(); //결과를 알리는 문자열
     }
     
@@ -1087,86 +1172,15 @@ public:
     *
     */
     void set_neopixel(int r, int g, int b) {
-        execFunc(202, r, g, b);
-    }
-    
-
-
-    /**
-    * @brief Retrieves the device identification string.
-    *
-    * This function executes the built-in function get the device's
-    * identification information, including the device name and current I2C address.
-    * The device name is set during `Chaino::setup()` initialization, and if not
-    * provided, defaults to "Chaino_Unknown".
-    *
-    * @return String containing device identification in the format:
-    *         "DeviceName (I2C addr.:0xXX)"
-    *         - DeviceName: The name set during `Chaino::setup(name)` or "Chaino_Unknown" if not set
-    *         - 0xXX: Current I2C address in hexadecimal format (e.g., 0x40, 0x45)
-    *
-    * @note This function works on both local device (master) and remote I2C slave devices.
-    *
-    * ### Example – Basic device identification:
-    * @code
-    * // In setup, device was initialized with:
-    * // Chaino::setup("MySensor");
-    * 
-    * Chaino device(0x45);  // Target device at address 0x45
-    * String deviceInfo = device.who();
-    * Serial.println(deviceInfo);  // Output: "MySensor (I2C addr.:0x45)"
-    * 
-    * // For local device
-    * Chaino localDevice;
-    * String localInfo = localDevice.who();
-    * Serial.println(localInfo);   // Output: "MySensor(I2C addr.:0x40)"
-    * @endcode
-    *
-    * @see Chaino::setup(), set_i2c_address()
-    */
-    String who() {
-        execFunc(203);
-        return (String)getReturn();
-    }
-
-
-    /**
-    * @brief Gets the current I2C address of the target device.
-    *
-    * @return The current I2C address as a 7-bit value (e.g., 0x40).
-    *
-    * @note The returned value reflects the I2C address
-    * when the device is used as a slave one.
-    *
-    * ### python Example – Read local and remote addresses
-    * @code
-    * Chaino local("COM9");                // master (this device)
-    * byte a0 = local.get_addr();  // e.g., 0x40
-    *
-    * Chaino sensor("COM9", 0x45);         // remote slave at 0x45 through Serial 
-    * byte a1 = sensor.get_addr(); // returns 0x45 (device's current address)
-    * @endcode
-    *
-    * ### Micropython Example – Read local and remote addresses
-    * @code
-    *
-    * Chaino sensor(0x45);         // remote slave at 0x45
-    * byte a1 = sensor.get_addr(); // returns 0x45 (device's current address)
-    * @endcode
-    *
-    * @see set_addr()
-    */
-    byte get_addr() {
-        execFunc(204);
-        return (byte)getReturn();
+        execFunc(205, r, g, b);
     }
 
 
 protected:
-    byte _i2cAddr;         
+    byte _i2cAddr;
+    static void inline _setVer(const char* ver) {chaino_detail::setVer(ver);}       
 
 private:          
     chaino_detail::Params _args;
     chaino_detail::Params _rets;
-
 };
