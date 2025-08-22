@@ -7,8 +7,151 @@
  */
 #pragma once
 
-#define __CHAINO_HANA_VER__  "0.9.4"
+#define __CHAINO_HANA_VER__  "0.9.5"
 #include "Chaino.h"
+
+
+#if defined(ARDUINO_ARCH_RP2040) //|| defined(PICO_RP2350)======================
+
+    #include <hardware/pwm.h>
+    /*
+    inline void _setPwmBits(byte bits) {
+        long range = (long)pow(2, bits);
+        //RP2040에는 analogWriteResolution() 함수가 없음
+        analogWriteRange(range);
+    }*/
+
+    // RP2040에서 개별 핀별로 PWM 해상도 비트수를 설정하는 함수
+    void _setPwmBits(byte pin, byte bits) {
+        // 핀이 유효한 GPIO 핀인지 확인
+        if (pin >= NUM_DIGITAL_PINS) {
+            return; // 유효하지 않은 핀 번호
+        }
+        
+        // 비트수 범위 제한 (1~16비트)
+        if (bits < 1) bits = 1;
+        if (bits > 16) bits = 16;
+        
+        // 해당 핀의 PWM 슬라이스 번호 가져오기
+        uint slice_num = pwm_gpio_to_slice_num(pin);
+        
+        // 비트수에 따른 TOP 값 계산 (2^bits - 1)
+        uint32_t top = (1UL << bits) - 1;
+        
+        // 현재 설정된 분주비 값 유지
+        uint32_t current_div = pwm_hw->slice[slice_num].div;
+        
+        // PWM 설정 적용
+        pwm_set_wrap(slice_num, top);  // TOP 값 설정으로 해상도 결정
+        
+        // 해당 핀을 PWM 기능으로 설정
+        gpio_set_function(pin, GPIO_FUNC_PWM);
+        
+        // PWM 슬라이스 활성화
+        pwm_set_enabled(slice_num, true);
+    }
+
+
+    // 현재 설정된 PWM 해상도 비트수를 확인하는 보조 함수
+    byte _getPwmBits(byte pin) {
+        if (pin >= NUM_DIGITAL_PINS) {
+            return 0;
+        }
+        
+        uint slice_num = pwm_gpio_to_slice_num(pin);
+        uint32_t top = pwm_hw->slice[slice_num].top;
+        
+        // TOP 값으로부터 비트수 계산
+        byte bits = 0;
+        uint32_t temp = top + 1;
+        while (temp > 1) {
+            temp >>= 1;
+            bits++;
+        }
+        
+        return bits;
+    }
+
+
+    void _setPwmFreq(byte pin, long freq) {
+        // 핀이 유효한 GPIO 핀인지 확인
+        if (pin >= NUM_DIGITAL_PINS) {
+            return; // 유효하지 않은 핀 번호
+        }
+        
+        // 해당 핀의 PWM 슬라이스 번호 가져오기
+        uint slice_num = pwm_gpio_to_slice_num(pin);
+        
+        // 시스템 클록 주파수 (RP2040은 기본적으로 125MHz)
+        uint32_t clock_freq = clock_get_hz(clk_sys);
+        
+        // 주파수가 너무 낮거나 높은 경우 제한
+        if (freq < 1) freq = 1;
+        if (freq > clock_freq / 2) freq = clock_freq / 2;
+        
+        // PWM 분주비와 TOP 값 계산
+        // PWM 주파수 = clock_freq / ((div + div_frac/16) * (top + 1))
+        // 여기서는 정수 분주비만 사용하여 간단화
+        
+        uint32_t div_int = 1;
+        uint32_t top = (clock_freq / freq) - 1;
+        
+        // TOP 값이 65535를 초과하면 분주비를 증가
+        while (top > 65535 && div_int < 255) {
+            div_int++;
+            top = (clock_freq / (div_int * freq)) - 1;
+        }
+        
+        // TOP 값이 여전히 너무 크면 최대값으로 제한
+        if (top > 65535) {
+            top = 65535;
+        }
+        
+        // PWM 설정 적용
+        pwm_set_clkdiv_int_frac(slice_num, div_int, 0); // 정수 분주비만 사용
+        pwm_set_wrap(slice_num, top);                   // TOP 값 설정
+        
+        // 해당 핀을 PWM 기능으로 설정
+        gpio_set_function(pin, GPIO_FUNC_PWM);
+        
+        // PWM 슬라이스 활성화
+        pwm_set_enabled(slice_num, true);
+    }
+
+
+    // 현재 설정된 PWM 주파수를 확인하는 보조 함수
+    uint32_t _getPwmFreq(byte pin) {
+        if (pin >= NUM_DIGITAL_PINS) {
+            return 0;
+        }
+        
+        uint slice_num = pwm_gpio_to_slice_num(pin);
+        uint32_t clock_freq = clock_get_hz(clk_sys);
+        uint32_t div_int = pwm_hw->slice[slice_num].div >> PWM_CH0_DIV_INT_LSB;
+        uint32_t top = pwm_hw->slice[slice_num].top;
+        
+        if (div_int == 0) div_int = 1;
+        if (top == 0) top = 1;
+        
+        return clock_freq / (div_int * (top + 1));
+    }
+
+
+#elif defined(ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32S3) //=================
+
+    inline void _setPwmBits(byte pin, byte bits) {
+        analogWriteResolution(pin, bits);
+    }
+
+    inline void _setPwmFreq(byte pin, long freq) {
+        analogWriteFrequency(pin, freq);
+    }
+
+
+#endif //=======================================================================
+
+
+
 
 
 /**
@@ -138,21 +281,24 @@ public:
 
         // PWM functions ######################################################
         Chaino::registerFunc(21, [](){          //analogWrite()
-            int pin = (int)Chaino::getArg();
+            byte pin = (byte)Chaino::getArg();
             int duty = (int)Chaino::getArg();
             analogWrite(pin, duty);
         });
 
 
         Chaino::registerFunc(22, [](){          //analogWriteFreq() (default:1KHz)
-            int freq = (int)Chaino::getArg();
-            analogWriteFreq(freq);
+            byte pin = (byte)Chaino::getArg();
+            long freq = (long)Chaino::getArg();
+            _setPwmFreq(pin, freq);
         });
 
 
         Chaino::registerFunc(23, [](){          //analogWriteRange()(default:255)
-            int range = (int)Chaino::getArg();  
-            analogWriteRange(range);
+            byte pin = (byte)Chaino::getArg();  
+            byte bits = (byte)Chaino::getArg();  
+            //analogWriteRange(range);
+            _setPwmBits(pin, bits);
         });
 
 
@@ -318,8 +464,8 @@ public:
      * hana.write_analog(9, 512);
      * @endcode
      */
-    void set_pwm_range(int range) {
-        execFunc(23, range);
+    void set_pwm_bits(int bits) {
+        execFunc(23, bits);
     }
 
 

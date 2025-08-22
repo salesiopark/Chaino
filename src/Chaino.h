@@ -9,7 +9,7 @@
 */
 #pragma once
 
-#define __CHAINO_VER__ "0.9.4"
+#define __CHAINO_VER__ "0.9.5"
 
 #include <map>
 #include <vector>
@@ -26,12 +26,23 @@
 //네임스페이스명에 detail이 붙으면 (사용자가 건드릴 수 없는) 내부용이라는 암시임
 namespace chaino_detail {
 
+//2025/Aug/21: 보드를 구별하기 위한 매크로 추가
+#if defined(ARDUINO_ARCH_RP2040) || defined(PICO_RP2350)
     const byte PIN_MASTER_SLAVE = 8;
-    String strWho = "Chaino";
+    const byte PIN_INTERNAL_NEOPX =  16;
+#elif defined(ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32S3)
+    const byte PIN_INTERNAL_NEOPX =  21;
+    const byte PIN_MASTER_SLAVE =  7;
+#else
+    #error "Arduino boards must use one of the RP2040, RP2350, or ESP32-S3 microcontrollers!"
+#endif
+    
+    //const byte PIN_MASTER_SLAVE = 8;
+    String strWho = "Chaino_Unknown";
     String strVer = __CHAINO_VER__;
 
     
-    Adafruit_NeoPixel neoPx(1, 16, NEO_GRB + NEO_KHZ800);
+    Adafruit_NeoPixel neoPx(1, PIN_INTERNAL_NEOPX, NEO_GRB + NEO_KHZ800);
     void setNeoPxColorRGB(const byte r, const byte g, const byte b){
         neoPx.setPixelColor(0, neoPx.Color(r, g, b)); // (R,G,B)
         neoPx.show(); 
@@ -359,15 +370,41 @@ namespace chaino_detail {
         volatile byte address = ADDR_DEFAULT;
         bool isMaster = false;
 
+
+//2025/Aug/21: 보드를 구별하기 위한 매크로 추가
+#if defined(ARDUINO_ARCH_RP2040) || defined(PICO_RP2350)
+        inline void beginWire1Master() {
+            //Wire1의 기본핀이 26,27번이기 때문에 2,3번으로 교체
+            Wire1.setSDA(2);
+            Wire1.setSCL(3);
+            Wire1.begin();
+            Wire1.setClock(400000);//반드시 Wire1.begin()직후에 fast모드로 설정 (default:100kHz이므로)
+        }
+        inline void beginWire1Slave() {
+            //Wire1의 기본핀이 26,27번이기 때문에 2,3번으로 교체
+            Wire1.setSDA(2);
+            Wire1.setSCL(3);
+            Wire1.begin(address);
+        }
+#elif defined(ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32S3)
+        inline void beginWire1Master() {
+            Wire1.begin(13, 12);//SDA1, SCL1
+            Wire1.setClock(400000);//반드시 Wire1.begin()직후에 fast모드로 설정 (default:100kHz이므로)
+        }
+        inline void beginWire1Slave() {
+            Wire1.begin(address, 13, 12, 400000);//ADDR, SDA1, SCL1, 주파수 순서임
+            //네번째 arg로 400k를 지정해주어야만 정상적인 슬레이브 동작을 한다.
+            //그냥 Wire1.begin(address, 13, 12); 이렇게만 해도 슬레이브동작에 문제없다는
+            //검색결과가 많지만 실제로는 그렇지 않았다.
+        }
+#endif
+
+
         namespace master{
 
 
             void begin() { //beginMaster()
-                //Wire1의 기본핀이 26,27번이기 때문에 2,3번으로 교체
-                Wire1.setSDA(2);
-                Wire1.setSCL(3);
-                Wire1.begin();
-                Wire1.setClock(400000);//반드시 Wire1.begin()직후에 fast모드로 설정 (default:100kHz이므로)
+                beginWire1Master();
                 isMaster = true;
                 //Serial.println("I2C Master 모드 초기화 완료");
             }
@@ -542,10 +579,7 @@ namespace chaino_detail {
 
             void begin() { //slave::begin()
 
-                //RP2040-zero보드의 Wire1핀이 26,27번이기 때문에 2,3번으로 교체
-                Wire1.setSDA(2);
-                Wire1.setSCL(3);
-                Wire1.begin(address); // 슬레이브 모드로 초기화
+                beginWire1Slave();
                 Wire1.onReceive(onReceive); // 데이터 수신 콜백 등록
                 Wire1.onRequest(onRequest); // 데이터 요청 콜백 등록
                 
