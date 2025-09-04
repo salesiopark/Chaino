@@ -372,13 +372,14 @@ namespace chaino_detail {
 
 
 //2025/Aug/21: 보드를 구별하기 위한 매크로 추가
+        const long i2cFreq = 400000; //400kHz
 #if defined(ARDUINO_ARCH_RP2040) || defined(PICO_RP2350)
         inline void beginWire1Master() {
             //Wire1의 기본핀이 26,27번이기 때문에 2,3번으로 교체
             Wire1.setSDA(2);
             Wire1.setSCL(3);
             Wire1.begin();
-            Wire1.setClock(400000);//반드시 Wire1.begin()직후에 fast모드로 설정 (default:100kHz이므로)
+            Wire1.setClock(i2cFreq);//반드시 Wire1.begin()직후에 fast모드로 설정 (default:100kHz이므로)
         }
         inline void beginWire1Slave() {
             //Wire1의 기본핀이 26,27번이기 때문에 2,3번으로 교체
@@ -389,10 +390,10 @@ namespace chaino_detail {
 #elif defined(ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32S3)
         inline void beginWire1Master() {
             Wire1.begin(13, 12);//SDA1, SCL1
-            Wire1.setClock(400000);//반드시 Wire1.begin()직후에 fast모드로 설정 (default:100kHz이므로)
+            Wire1.setClock(i2cFreq);//반드시 Wire1.begin()직후에 fast모드로 설정 (default:100kHz이므로)
         }
         inline void beginWire1Slave() {
-            Wire1.begin(address, 13, 12, 400000);//ADDR, SDA1, SCL1, 주파수 순서임
+            Wire1.begin(address, 13, 12, i2cFreq);//ADDR, SDA1, SCL1, 주파수 순서임
             //네번째 arg로 400k를 지정해주어야만 정상적인 슬레이브 동작을 한다.
             //그냥 Wire1.begin(address, 13, 12); 이렇게만 해도 슬레이브동작에 문제없다는
             //검색결과가 많지만 실제로는 그렇지 않았다.

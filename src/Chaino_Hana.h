@@ -9,7 +9,7 @@
 
 #define __CHAINO_HANA_VER__  "0.9.5"
 #include "Chaino.h"
-
+#include <map>
 
 #if defined(ARDUINO_ARCH_RP2040) //|| defined(PICO_RP2350)======================
 
@@ -154,6 +154,7 @@
 
 
 
+
 /**
  * @class Chaino_Hana
  * @brief A specialized class for the "Chaino Hana" board, providing an API for hardware control.
@@ -259,7 +260,8 @@ public:
 
 
         Chaino::registerFunc(13, [](){        //digitalWrite()
-            int pin = (int)Chaino::getArg();  
+            int pin = (int)Chaino::getArg();
+
             int status = (int)Chaino::getArg();
             digitalWrite(pin, status);
         });
@@ -276,6 +278,23 @@ public:
             int bits(Chaino::getArg());  
             analogReadResolution(bits);
         }); //analogReadRange()는 RP2040에서는 없다
+
+
+
+
+        //2025/Sep/4 added
+        Chaino::registerFunc(16, [](){     //void pull_up(pin)
+            int pin(Chaino::getArg());
+            _pullUp(pin);
+        }); //analogReadRange()는 RP2040에서는 없다
+
+        //2025/Sep/4 added
+        Chaino::registerFunc(17, [](){     //void pull_down(pin)
+            int pin(Chaino::getArg());
+            _pullDown(pin);
+        }); //analogReadRange()는 RP2040에서는 없다
+
+
 
 
 
@@ -542,6 +561,37 @@ public:
 
 private:
     static bool isSetup;//Chaino_Hana::setup()함수는 딱 한 번만 실행
+    std::map<uint16_t, int8_t> _mapPinMode;
+
+    //digitalWrite 이라면 무조건 OUTPUT으로 설정
+    inline void _setOutput(int pin) {
+        pinMode(pin,OUTPUT);
+        _mapPinMode[pin] = OUTPUT;
+    }
+
+    inline void _pullUp(int pin) {
+        pinMode(pin, INPUT_PULLUP);
+        _mapPinMode[pin] = INPUT_PULLUP;
+    }
+
+    inline void _pullDown(int pin) {
+        pinMode(pin, INPUT_PULLDOWN);
+        _mapPinMode[pin] = INPUT_PULLDOWN;
+    }
+
+    //
+    void _setInput(int pin) {
+        auto it = _mapPinMode.find(pin);
+        if (it == _mapPinMode.end()) {// key없음: INPUT으로 설정 후 기록
+            pinMode(pin, INPUT);
+            _mapPinMode[pin] = INPUT;
+        } else if (it->second == OUTPUT) {// key존재: OUTPUT → INPUT 전환
+            pinMode(pin, INPUT);
+            it->second = INPUT;
+        } //else {OUTPUT이 아니면 이미 INPUT 계열 모드이므로 아무 작업 안 함}
+    }
+
+
 };
 
 bool Chaino_Hana::isSetup = false;
