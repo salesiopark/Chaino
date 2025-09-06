@@ -9,7 +9,7 @@
 */
 #pragma once
 
-#define __CHAINO_VER__ "0.9.5"
+#define __CHAINO_VER__ "0.9.6"
 
 #include <map>
 #include <vector>

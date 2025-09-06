@@ -7,9 +7,13 @@
  */
 #pragma once
 
-#define __CHAINO_HANA_VER__  "0.9.5"
+#define __CHAINO_HANA_VER__  "0.9.6"
 #include "Chaino.h"
 #include <map>
+
+//#if defined(ARDUINO_ARCH_RP2040)
+//  #include "hardware/gpio.h"   // gpio_set_pulls 사용
+//#endif
 
 #if defined(ARDUINO_ARCH_RP2040) //|| defined(PICO_RP2350)======================
 
@@ -206,23 +210,12 @@ public:
      */
     Chaino_Hana(byte addr=0): Chaino(addr) {
         if (addr == 0 ) {
-            if (!isSetup) setup();
+            if (!_isSetup) setup();
         } else {
             Chaino::setup();
         }
     } 
 
-    /*
-    void begin() {
-
-        if (_i2cAddr == 0 ) {
-            if (!isSetup) setup();
-        } else {
-            Chaino::setup();
-        }
-        
-    } */       
-    
 
     /**
      * @brief Registers all built-in functions for the Chaino Hana board.
@@ -238,43 +231,39 @@ public:
         _setVer(__CHAINO_HANA_VER__);         //버전 문자열 지정
         
 
-        // Basic In/Out functions #################################################
-        // user function must be {void func(void)} type
-        Chaino::registerFunc(11, [](){       // pinMode()
-            // 함수의 인수는 반드시 명시적 변환만 가능
-            int pin( Chaino::getArg() );  //첫번째 int형 인수
-            int mode( Chaino::getArg() );  //두번째 int형 인수
-            // 또는 
-            //int pin = (int)Chaino::getArg();  
-            //int mode = (int)Chaino::getArg(); 
-            //라고 명시적인 형을 반환하는 함수를 사용해도 된다.
-            pinMode(pin, mode);
-        }); 
+        //☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷
+        Chaino::registerFunc(10, [](){        //set_high(pin) : digitalWrite(pin, HIGH)
+            uint16_t pin = (unsigned short)Chaino::getArg();
+            _setOutput(pin);
+            digitalWrite(pin, HIGH);
+        });
+
+        Chaino::registerFunc(11, [](){        //set_low(pin) : digitalWrite(pin, LOW)
+            uint16_t pin = (unsigned short)Chaino::getArg();
+            _setOutput(pin);
+            digitalWrite(pin, LOW);
+        });
 
 
-        Chaino::registerFunc(12, [](){        //digitalRead()
-            int pin = (int)Chaino::getArg();  
+
+        Chaino::registerFunc(12, [](){        //read_pin(pin) : digitalRead()
+            uint16_t pin = (unsigned short)Chaino::getArg();
+            _setInput(pin);  
             int val = digitalRead(pin);
             Chaino::setReturn(val);
         });
 
 
-        Chaino::registerFunc(13, [](){        //digitalWrite()
-            int pin = (int)Chaino::getArg();
-
-            int status = (int)Chaino::getArg();
-            digitalWrite(pin, status);
-        });
         
 
-        Chaino::registerFunc(14, [](){       //analogRead()
-            int pin(Chaino::getArg());
+        Chaino::registerFunc(13, [](){       //read_analog(pin) : analogRead()
+            uint16_t pin = (unsigned short)Chaino::getArg();
             int adc = analogRead(pin);
             Chaino::setReturn(adc);
         });  
         
         
-        Chaino::registerFunc(15, [](){     //analogReadResolution() => set_adc_range()       
+        Chaino::registerFunc(14, [](){     //set_analog_resolution() :  analogReadResolution() =>      
             int bits(Chaino::getArg());  
             analogReadResolution(bits);
         }); //analogReadRange()는 RP2040에서는 없다
@@ -282,23 +271,35 @@ public:
 
 
 
-        //2025/Sep/4 added
-        Chaino::registerFunc(16, [](){     //void pull_up(pin)
-            int pin(Chaino::getArg());
+        //2025/Sep/4 added  pull_up() and pull_down()
+        Chaino::registerFunc(15, [](){     //void pull_up(pin)
+            uint16_t pin = (unsigned short)Chaino::getArg();
             _pullUp(pin);
-        }); //analogReadRange()는 RP2040에서는 없다
+        });
 
-        //2025/Sep/4 added
-        Chaino::registerFunc(17, [](){     //void pull_down(pin)
-            int pin(Chaino::getArg());
+
+        Chaino::registerFunc(16, [](){     //void pull_down(pin)
+            uint16_t pin = (unsigned short)Chaino::getArg();
             _pullDown(pin);
-        }); //analogReadRange()는 RP2040에서는 없다
+        });
 
 
-
-
-
+        Chaino::registerFunc(17, [](){     //void pull_clear(pin)
+            uint16_t pin = (unsigned short)Chaino::getArg();
+            pinMode(pin,INPUT);
+            _mapPinMode[pin] = INPUT;
+        });
+        
+        
+        //☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷
         // PWM functions ######################################################
+
+        // 2025/09/06:RP2040 의 모든 pwm주파수 default분해능을 10bit로 설정
+        // 이것이 생략되면 9bit모드로 동작(최대 511)
+        #if defined(ARDUINO_ARCH_RP2040)
+            analogWriteResolution(10); // 모든 PWM 핀에 10비트 분해능 설정 (0~1023)
+        #endif
+
         Chaino::registerFunc(21, [](){          //analogWrite()
             byte pin = (byte)Chaino::getArg();
             int duty = (int)Chaino::getArg();
@@ -314,10 +315,10 @@ public:
 
 
         Chaino::registerFunc(23, [](){          //analogWriteRange()(default:255)
-            byte pin = (byte)Chaino::getArg();  
             byte bits = (byte)Chaino::getArg();  
-            //analogWriteRange(range);
-            _setPwmBits(pin, bits);
+            #if defined(ARDUINO_ARCH_RP2040)
+                analogWriteResolution(bits); // 모든 PWM 핀에 10비트 분해능 설정 (0~1023)
+            #endif
         });
 
 
@@ -356,27 +357,37 @@ public:
         });
 
 
-
-
-        isSetup = true;
+        _isSetup = true;
 
     }//satic void setup()
 
     
-    // Basic IO functions #################################################// definitions of public methods
+    //☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷
+    // Basic IO functions #################################################
 
     /**
-     * @brief Sets the mode of a digital pin (e.g., INPUT, OUTPUT).
-     * @details This function corresponds to the standard Arduino `pinMode()` function.
-     * @param pin The GPIO pin number to configure.
-     * @param mode The mode to set, such as `INPUT`, `OUTPUT`, or `INPUT_PULLUP`.
+     * @brief Writes a digital value HIGH to a pin.
+     * @details Corresponds to the standard Arduino `digitalWrite(pin,HIGH)` function.
+     * @param pin The GPIO pin number to write to.
      * @code
-     * Chaino_Hana hana(0x42);
-     * hana.set_pin_mode(13, OUTPUT); // Set pin 13 as an output
+     * hana.set_high(13); // Turn on an LED connected to gpio13
      * @endcode
      */
-    void set_pin_mode(int pin, int mode) {
-        execFunc(11, pin, mode); //this->execFunc() 실행
+    void set_high(uint16_t pin) {
+        execFunc(10, pin);
+    }
+
+
+    /**
+     * @brief Writes a digital value LOW to a pin.
+     * @details Corresponds to the standard Arduino `digitalWrite(pin,LOW)` function.
+     * @param pin The GPIO pin number to write to.
+     * @code
+     * hana.set_low(13); // Turn off an LED connected to gpio13
+     * @endcode
+     */
+    void set_low(uint16_t pin) {
+        execFunc(11, pin);
     }
 
 
@@ -384,29 +395,29 @@ public:
      * @brief Reads the state of a digital pin.
      * @details Corresponds to the standard Arduino `digitalRead()` function.
      * @param pin The GPIO pin number to read from.
-     * @return The state of the pin, either `HIGH` (1) or `LOW` (0).
+     * @return true if the state of the pin is `HIGH`
      * @code
-     * int buttonState = hana.read_digital(2);
+     * int buttonState = hana.is_high();
      * @endcode
      */
-    int read_digital(int pin){
+    bool is_high(uint16_t pin) {
         execFunc(12, pin);
-        return (int)getReturn();
+        return (int)getReturn()==1;
     }
 
-    
     /**
-     * @brief Writes a digital value (HIGH or LOW) to a pin.
-     * @details Corresponds to the standard Arduino `digitalWrite()` function.
-     * @param pin The GPIO pin number to write to.
-     * @param status The value to write, either `HIGH` or `LOW`.
+     * @brief Reads the state of a digital pin.
+     * @details Corresponds to the standard Arduino `digitalRead()==LOW`
+     * @param pin The GPIO pin number to read from.
+     * @return true if the state of the pin is `LOW`
      * @code
-     * hana.write_digital(13, HIGH); // Turn on an LED
+     * int buttonState = hana.is_low(2);
      * @endcode
      */
-    void write_digital(int pin, int status) {
-        execFunc(13, pin, status);
+    bool is_low(uint16_t pin) {
+        return !is_high(pin);
     }
+
 
 
      /**
@@ -419,8 +430,8 @@ public:
      * int sensorValue = hana.read_analog(A0);
      * @endcode
      */   
-    int read_analog(int pin) {
-        execFunc(14, pin);
+    int read_analog(uint16_t pin) {
+        execFunc(13, pin);
         return (int)getReturn();
     }
 
@@ -431,15 +442,68 @@ public:
      * @note The available resolution depends on the board's hardware capabilities.
      * @code
      * // Set ADC resolution to 12 bits (0-4095)
-     * hana.set_adc_range(12);
+     * hana.set_adc_bits(12);
      * int highResValue = hana.read_analog(A0);
      * @endcode
      */
-    void set_adc_bits(int bits) {
-        execFunc(15, bits);
+    void set_analog_resolution(int bits) {
+        execFunc(14, bits);
     }
 
 
+    /**
+     * @brief Configures a digital pin to have an internal pull-up resistor.
+     * @details This function is equivalent to calling `pinMode(pin, INPUT_PULLUP)`
+     * and is typically used for input pins that would otherwise be floating.
+     * @param pin The GPIO pin number on which to enable the pull-up resistor.
+     * @code
+     * // connect internal pull-up resistor on pin 7
+     * hana.pull_up(7)
+     * @endcode
+     */
+    void pull_up(uint16_t pin) {
+        execFunc(15, pin);
+    }
+
+
+    /**
+     * @brief Configures a digital pin to have an internal pull-down resistor.
+     * @details This function is equivalent to calling `pinMode(pin, INPUT_PULLDOWN)`
+     * and is typically used for input pins that would otherwise be floating.
+     * @param pin The GPIO pin number on which to enable the pull-down resistor.
+     * @code
+     * // connect internal pull-down resistor on pin 7
+     * hana.pull_down(7)
+     * @endcode
+     */
+    void pull_down(uint16_t pin) {
+        execFunc(16, pin);
+    }
+
+
+    /**
+    * @brief Deactivates the internal pull-up or pull-down resistor on a specified digital pin.
+    *
+    * This function effectively sets the pin to a standard input mode, removing any
+    * active pull-up or pull-down configuration.
+    * It's functionally similar to `pinMode(pin, INPUT)` in Arduino, specifically
+    * for clearing pull-resistor settings.
+    *
+    * @param pin The number of the digital pin to configure.
+    * @return void
+    *
+    * @code
+    * // Enable pull-up on pin 2
+    * hana.pull_up(2);
+    * // Later, clear the pull-up/pull-down resistor setting on pin 2
+    * hana.pull_clear(2);
+    * @endcode
+    */
+    void pull_clear(uint16_t pin) {
+        execFunc(17, pin);
+    }
+
+    //☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷☷
     // PWM functions ######################################################
 
     
@@ -468,22 +532,22 @@ public:
      * hana.set_pwm_freq(1000);
      * @endcode
      */
-    void set_pwm_freq(int freq) {
-        execFunc(22, freq);
+    void set_pwm_freq(int pin, int freq) {
+        execFunc(22, pin, freq);
     }
 
     /**
      * @brief Sets the range for PWM duty cycles (`analogWrite`).
      * @details Corresponds to `analogWriteRange()` on supported boards. The default is 255.
-     * @param range The maximum value for the duty cycle (e.g., 1023 for 10-bit resolution).
+     * @param bits The number of bits for the duty cycle (e.g., 10 for 10-bit resolution).
      * @code
-     * // Set PWM range for 10-bit resolution
-     * hana.set_pwm_range(1023);
+     * // Set PWM range for 11-bit resolution
+     * hana.set_pwm_bits(11);
      * // Set LED to 50% brightness
-     * hana.write_analog(9, 512);
+     * hana.write_analog(9, 1024);
      * @endcode
      */
-    void set_pwm_bits(int bits) {
+    void set_pwm_resolution(int bits) {
         execFunc(23, bits);
     }
 
@@ -560,29 +624,33 @@ public:
 
 
 private:
-    static bool isSetup;//Chaino_Hana::setup()함수는 딱 한 번만 실행
-    std::map<uint16_t, int8_t> _mapPinMode;
+    inline static bool _isSetup = false;//Chaino_Hana::setup()함수는 딱 한 번만 실행
+    inline static std::map<uint16_t, int8_t> _mapPinMode{};
 
     //digitalWrite 이라면 무조건 OUTPUT으로 설정
-    inline void _setOutput(int pin) {
-        pinMode(pin,OUTPUT);
-        _mapPinMode[pin] = OUTPUT;
+    inline static void _setOutput(uint16_t pin) {
+        auto it = _mapPinMode.find(pin);
+        // key가 없거나, 있는데 value가 OUTPUT이 아니라면
+        if(it == _mapPinMode.end() || it->second != OUTPUT) {
+            pinMode(pin,OUTPUT);
+            it->second = OUTPUT;//key가 없다면 생성, 있다면 덮어씀
+        }
     }
 
-    inline void _pullUp(int pin) {
+    inline static void _pullUp(uint16_t pin) {
         pinMode(pin, INPUT_PULLUP);
         _mapPinMode[pin] = INPUT_PULLUP;
     }
 
-    inline void _pullDown(int pin) {
+    inline static void _pullDown(uint16_t pin) {
         pinMode(pin, INPUT_PULLDOWN);
         _mapPinMode[pin] = INPUT_PULLDOWN;
     }
 
     //
-    void _setInput(int pin) {
+    inline static void _setInput(uint16_t pin) {
         auto it = _mapPinMode.find(pin);
-        if (it == _mapPinMode.end()) {// key없음: INPUT으로 설정 후 기록
+        if (it == _mapPinMode.end()) {// key없음: INPUT으로 설정 후 새로 기록
             pinMode(pin, INPUT);
             _mapPinMode[pin] = INPUT;
         } else if (it->second == OUTPUT) {// key존재: OUTPUT → INPUT 전환
@@ -593,10 +661,3 @@ private:
 
 
 };
-
-bool Chaino_Hana::isSetup = false;
-/*
-void goo() {
-    ap::setReturn("1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN(50)1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN(100)1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN(150)1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN(200)012345678901234567890123<250");
-}
-*/
